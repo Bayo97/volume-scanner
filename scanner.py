@@ -56,7 +56,7 @@ def polling():
                     txt = u["message"].get("text", "").lower().strip()
                     cid = u["message"]["chat"]["id"]
                     if txt in ["/start", "/help"]:
-                        send(BIO + "\n\nDziala 24/7 na Railway", cid)
+                        send(BIO + "\n\nDziala 24/7 | Copyright: Coinn.pl", cid)
                     elif txt == "/stats":
                         send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertow: {total_alerts} | Dzis: {today_alerts} | Godzina: {hour_alerts}", cid)
                     elif txt in ["/status", "/uptime"]:
