@@ -13,14 +13,24 @@ MIN_VOLUME_24H = 300_000
 
 BIO = """Multi-CEX Volume Pump Scanner v2025
 
-Low-capy 1-30M MC - 6 gield jednoczesnie
+Low-capy 1-30M MC - 6 gield jednocześnie
 Binance - Bybit - Gate.io - MEXC - KuCoin - OKX
 
-Lapie pompy x10-x500 w pierwszych minutach
+Łapie pompy x10–x500 w pierwszych minutach
 
 Zero spamu - tylko prawdziwe okazje"""
 
-exchanges = [ccxt.coinex(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
+COMMANDS = """
+Dostępne komendy:
+
+ /start lub /help – opis bota + lista komend
+ /stats – statystyki działania i liczba alertów
+ /uptime lub /status – czas działania bota
+ /top – ostatnie 10 złapanych pomp
+
+Bot działa 24/7 na Railway (EU Amsterdam)"""
+
+exchanges = [ccxt.binance(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
 
 start_time = time.time()
 last_heartbeat = time.time()
@@ -56,9 +66,9 @@ def polling():
                     txt = u["message"].get("text", "").lower().strip()
                     cid = u["message"]["chat"]["id"]
                     if txt in ["/start", "/help"]:
-                        send(BIO + "\n\nDziala 24/7 | Copyright: Coinn.pl", cid)
+                        send(BIO + COMMANDS, cid)
                     elif txt == "/stats":
-                        send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertow: {total_alerts} | Dzis: {today_alerts} | Godzina: {hour_alerts}", cid)
+                        send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts} | Godzina: {hour_alerts}", cid)
                     elif txt in ["/status", "/uptime"]:
                         send(f"Zyje - uptime: {format_uptime(time.time()-start_time)}\nOstatni heartbeat: {datetime.fromtimestamp(last_heartbeat).strftime('%H:%M')}", cid)
                     elif txt == "/top":
@@ -81,7 +91,7 @@ while True:
                     o = ex.fetch_ohlcv(s, "5m", limit=50)
                     if len(o) < 30: continue
                     vol_now = o[-1][5]
-                    vol_prev = sum(x[5] for x in o[-25:-1]) / 24   # <-- naprawione!
+                    vol_prev = sum(x[5] for x in o[-25:-1]) / 24
                     if vol_prev == 0: continue
                     ratio = vol_now / vol_prev
                     price_ch = (o[-1][4] - o[-2][4]) / o[-2][4] * 100
