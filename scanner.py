@@ -14,7 +14,7 @@ MIN_VOLUME_24H = 300_000
 BIO = """Multi-CEX Volume Pump Scanner v2025
 
 Low-capy 1-30M MC - 6 gield jednocześnie
-Binance - Bybit - Gate.io - MEXC - KuCoin - OKX
+CoinEx - Bybit - Gate.io - MEXC - KuCoin - OKX
 
 Łapie pompy x10–x500 w pierwszych minutach
 
@@ -28,9 +28,9 @@ Dostępne komendy:
  /uptime lub /status – czas działania bota
  /top – ostatnie 10 złapanych pomp
 
-Bot działa 24/7 na Railway (EU Amsterdam)"""
+Bot działa 24/7 | Copyright Coinn.pl | CET """
 
-exchanges = [ccxt.binance(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
+exchanges = [ccxt.coinex(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
 
 start_time = time.time()
 last_heartbeat = time.time()
