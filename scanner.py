@@ -81,7 +81,7 @@ while True:
                     o = ex.fetch_ohlcv(s, "5m", limit=50)
                     if len(o) < 30: continue
                     vol_now = o[-1][5]
-                    vol_prev = sum(x[5 for x in o[-25:-1]) / 24
+                    vol_prev = sum(x[5] for x in o[-25:-1]) / 24   # <-- naprawione!
                     if vol_prev == 0: continue
                     ratio = vol_now / vol_prev
                     price_ch = (o[-1][4] - o[-2][4]) / o[-2][4] * 100
