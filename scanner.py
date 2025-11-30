@@ -20,7 +20,7 @@ Lapie pompy x10-x500 w pierwszych minutach
 
 Zero spamu - tylko prawdziwe okazje"""
 
-exchanges = [ccxt.binance(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
+exchanges = [ccxt.coinex(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
 
 start_time = time.time()
 last_heartbeat = time.time()
