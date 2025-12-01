@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-MY_PRIVATE_ID = 542711955   # Twój prywatny chat_id
+MY_PRIVATE_ID = 542711955   # Twój prywatny chat_id – możesz tu dodać więcej, np. [542711955, 123456789]
 
 MIN_VOLUME_24H = 250_000
 
@@ -35,7 +35,7 @@ def format_uptime(sec): return str(timedelta(seconds=int(sec))).split('.')[0]
 def send(msg, to_private=False):
     for cid in CHAT_IDS:
         try:
-            if to_private and cid != MY_PRIVATE_ID:
+            if to_private and cid != MY_PRIVATE_ID and cid not in [MY_PRIVATE_ID]:  # tylko Ty widzisz błędy
                 continue
             requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
                           data={"chat_id": cid, "text": msg, "parse_mode": "HTML", "disable_web_page_preview": True},
@@ -43,33 +43,36 @@ def send(msg, to_private=False):
         except:
             pass
 
-send("CEX Pump & Dump Scanner 2025 uruchomiony\nCoinEx • Bybit • Gate • MEXC • KuCoin • OKX\nŁapie longi i shorty w pierwszych minutach")
+send("CEX Scanner 2025 działa na grupie i prywatnie")
 
 def polling():
     while True:
         try:
             r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates",
-                             params={"timeout": 15}, timeout=20).json()
+                             params={"timeout": 20}, timeout=25).json()
             for u in r.get("result", []):
                 if "message" in u:
                     cid = u["message"]["chat"]["id"]
-                    txt = u["message"].get("text", "").lower().strip()
-                    if cid == MY_PRIVATE_ID:
+                    txt = u["message"].get("text", "").strip().lower()
+
+                    print(f"ODEBRANO od {cid}: {txt}")  # widoczne w Railway Logs
+
+                    if cid == MY_PRIVATE_ID or cid < 0:  # prywatnie lub grupa – ale komendy tylko od Ciebie
                         if txt in ["/start", "/help"]:
-                            send("CEX Pump & Dump Scanner v12.2025\n\nKomendy:\n/stats\n/uptime\n/top")
+                            send("CEX Scanner v12.2025\nKomendy (tylko Ty):\n/stats\n/uptime\n/top")
                         elif txt == "/stats":
-                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts} | Godzina: {hour_alerts}")
+                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts}")
                         elif txt in ["/uptime", "/status"]:
                             send(f"Żyję – uptime: {format_uptime(time.time()-start_time)}")
                         elif txt == "/top":
-                            send("Ostatnie 10:\n\n" + "\n".join(last_alerts[-10:]) if last_alerts else "Czekamy na mięso...")
-        except:
-            pass
+                            send("Ostatnie 10:\n\n" + "\n".join(last_alerts[-10:]) if last_alerts else "Czekamy...")
+        except Exception as e:
+            print(f"Polling błąd: {e}")
         time.sleep(5)
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("CEX Pump & Dump Scanner 2025 działa idealnie!")
+print("CEX Scanner final – grupa + prywatnie")
 
 while True:
     try:
@@ -81,7 +84,6 @@ while True:
                     try:
                         o = ex.fetch_ohlcv(s, "5m", limit=50)
                         if len(o) < 30: continue
-
                         current_price = o[-1][4]
                         vol_now = o[-1][5]
                         vol_prev = sum(x[5] for x in o[-25:-1]) / 24
@@ -119,7 +121,6 @@ while True:
                 send(f"Błąd {ex.name}: {e}", to_private=True)
 
         seen_alerts.clear()
-
         time.sleep(300)
     except Exception as e:
         send(f"Krytyczny błąd: {e}", to_private=True)
