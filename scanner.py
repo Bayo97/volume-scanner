@@ -5,35 +5,25 @@ import threading
 import os
 from datetime import datetime, timedelta
 
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = int(os.environ.get("CHAT_ID"))
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
+CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-LOW_CAP_MAX = 30_000_000
-MIN_VOLUME_24H = 300_000
+MY_PRIVATE_ID = 542711955
 
-BIO = """Multi-CEX Volume Pump Scanner v2025
+MIN_VOLUME_24H = 250_000
 
-Low-capy 1-30M MC - 6 gield jednocześnie
-CoinEx - Bybit - Gate.io - MEXC - KuCoin - OKX
-
-Łapie pompy x10–x500 w pierwszych minutach
-
-Zero spamu - tylko prawdziwe okazje"""
-
-COMMANDS = """
-Dostępne komendy:
-
- /start lub /help – opis bota + lista komend
- /stats – statystyki działania i liczba alertów
- /uptime lub /status – czas działania bota
- /top – ostatnie 10 złapanych pomp
-
-Bot działa 24/7 | Copyright Coinn.pl | CET """
+EXCHANGE_LINKS = {
+    "CoinEx":  "https://www.coinex.com/en/exchange/{base}-usdt",
+    "Bybit":    "https://www.bybit.com/trade/spot/{base}/USDT",
+    "Gate.io":  "https://www.gate.io/trade/{base}_USDT",
+    "MEXC":    "https://www.mexc.com/exchange/{base}_USDT",
+    "KuCoin":   "https://www.kucoin.com/trade/{base}-USDT",
+    "OKX":     "https://www.okx.com/trade-spot/{base}-usdt",
+}
 
 exchanges = [ccxt.coinex(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
 
 start_time = time.time()
-last_heartbeat = time.time()
 total_alerts = 0
 today_alerts = 0
 hour_alerts = 0
@@ -42,79 +32,94 @@ seen_alerts = set()
 
 def format_uptime(sec): return str(timedelta(seconds=int(sec))).split('.')[0]
 
-def send(msg, chat_id=CHAT_ID):
-    try:
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                      data={"chat_id": chat_id, "text": msg, "parse_mode": "HTML", "disable_web_page_preview": True})
-    except: pass
+def send(msg, to_private=False):
+    for cid in CHAT_IDS:
+        try:
+            if to_private and cid != MY_PRIVATE_ID:
+                continue
+            requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                          data={"chat_id": cid, "text": msg, "parse_mode": "HTML", "disable_web_page_preview": True},
+                          timeout=10)
+        except:
+            pass
 
-def heartbeat():
-    global last_heartbeat
-    send(f"Bot zyje - uptime: {format_uptime(time.time() - start_time)}\n{datetime.now().strftime('%d.%m %H:%M')}")
-    last_heartbeat = time.time()
-
-send(f"Scanner wystartowal {datetime.now().strftime('%d.%m %H:%M')}\n\n{BIO}")
-heartbeat()
+send("CEX Pump & Dump Scanner 2025 uruchomiony\nCoinEx • Bybit • Gate • MEXC • KuCoin • OKX")
 
 def polling():
-    offset = 0
     while True:
         try:
-            r = requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates", params={"offset": offset, "timeout": 10}).json()
+            r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates",
+                             params={"timeout": 15}, timeout=20).json()
             for u in r.get("result", []):
                 if "message" in u:
-                    txt = u["message"].get("text", "").lower().strip()
                     cid = u["message"]["chat"]["id"]
-                    if txt in ["/start", "/help"]:
-                        send(BIO + COMMANDS, cid)
-                    elif txt == "/stats":
-                        send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts} | Godzina: {hour_alerts}", cid)
-                    elif txt in ["/status", "/uptime"]:
-                        send(f"Zyje - uptime: {format_uptime(time.time()-start_time)}\nOstatni heartbeat: {datetime.fromtimestamp(last_heartbeat).strftime('%H:%M')}", cid)
-                    elif txt == "/top":
-                        send("Ostatnie 10:\n\n" + "\n".join(last_alerts) if last_alerts else "Czekamy na pompy...", cid)
-                    offset = u["update_id"] + 1
-        except: pass
+                    txt = u["message"].get("text", "").lower().strip()
+                    if cid == MY_PRIVATE_ID:
+                        if txt in ["/start", "/help"]:
+                            send("CEX Pump & Dump Scanner v12.2025\n\nKomendy:\n/stats\n/uptime\n/top")
+                        elif txt == "/stats":
+                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts}")
+                        elif txt in ["/uptime", "/status"]:
+                            send(f"Żyję – uptime: {format_uptime(time.time()-start_time)}")
+                        elif txt == "/top":
+                            send("Ostatnie 10:\n\n" + "\n".join(last_alerts[-10:]) if last_alerts else "Czekamy...")
+        except:
+            pass
         time.sleep(5)
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("Scanner 24/7 dziala!")
+print("CEX Pump & Dump Scanner działa!")
 
 while True:
     try:
         for ex in exchanges:
-            markets = ex.load_markets()
-            pairs = [s for s in markets if "USDT" in s and markets[s]["active"]]
-            for s in pairs:
-                try:
-                    o = ex.fetch_ohlcv(s, "5m", limit=50)
-                    if len(o) < 30: continue
-                    vol_now = o[-1][5]
-                    vol_prev = sum(x[5] for x in o[-25:-1]) / 24
-                    if vol_prev == 0: continue
-                    ratio = vol_now / vol_prev
-                    price_ch = (o[-1][4] - o[-2][4]) / o[-2][4] * 100
-                    ticker = ex.fetch_ticker(s)
-                    vol24 = ticker.get("quoteVolume", vol_now * o[-1][4])
-                    if ratio > 9 and price_ch > 5 and vol24 > MIN_VOLUME_24H:
-                        base = s.split("/")[0]
-                        if base in seen_alerts: continue
-                        seen_alerts.add(base)
-                        msg = f"{base}/USDT na {ex.name}\nVol x{ratio:.1f} +{price_ch:.1f}%\nhttps://dexscreener.com/search?q={base}"
-                        send(msg)
-                        total_alerts += 1
-                        today_alerts += 1
-                        hour_alerts += 1
-                        last_alerts.append(f"{datetime.now().strftime('%H:%M')} | {base} | {ex.name} | x{ratio:.1f}")
-                        if len(last_alerts) > 10: last_alerts.pop(0)
-                except: continue
-            time.sleep(1)
+            try:
+                markets = ex.load_markets()
+                pairs = [s for s in markets if "USDT" in s and markets[s]["active"]]
+                for s in pairs:
+                    try:
+                        o = ex.fetch_ohlcv(s, "5m", limit=50)
+                        if len(o) < 30: continue
+                        current_price = o[-1][4]
+                        vol_now = o[-1][5]
+                        vol_prev = sum(x[5] for x in o[-25:-1]) / 24
+                        if vol_prev == 0: continue
+                        ratio = vol_now / vol_prev
+                        price_ch = (o[-1][4] - o[-2][4]) / o[-2][4] * 100
+                        ticker = ex.fetch_ticker(s)
+                        vol24 = ticker.get("quoteVolume", vol_now * current_price)
 
-        if time.time() - last_heartbeat >= 1800:
-            heartbeat()
+                        if ratio > 9 and abs(price_ch) > 5 and vol24 > MIN_VOLUME_24H:
+                            base = s.split("/")[0].split(":")[0].upper()
+                            alert_id = f"{base}_{ex.name}_{'LONG' if price_ch > 0 else 'SHORT'}"
+                            if alert_id in seen_alerts: continue
+                            seen_alerts.add(alert_id
+
+                            link = EXCHANGE_LINKS.get(ex.name, "https://dexscreener.com/search?q=" + base)
+                            link = link.replace("{base}", base)
+
+                            direction = "LONG 🚀" if price_ch > 0 else "SHORT 💥"
+
+                            msg = f"🚨 {base}/USDT na {ex.name}\n" \
+                                  f"Cena: ${current_price:.8f} ({price_ch:+.2f}%)\n" \
+                                  f"Vol ×{ratio:.1f}\n" \
+                                  f"{direction}\n" \
+                                  f"<a href='{link}'>OTWÓRZ NATYCHMIAST</a>"
+
+                            send(msg)
+                            total_alerts += 1
+                            today_alerts += 1
+                            hour_alerts += 1
+                            last_alerts.append(f"{datetime.now().strftime('%H:%M')} | {base} | {ex.name} | {direction} | {price_ch:+.1f}%")
+                    except: continue
+                time.sleep(1)
+            except Exception as e:
+                send(f"Błąd {ex.name}: {e}", to_private=True)
+
+        seen_alerts.clear()
 
         time.sleep(300)
     except Exception as e:
-        send(f"Blad: {e}")
+        send(f"Krytyczny błąd: {e}", to_private=True)
         time.sleep(60)
