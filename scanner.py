@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-MY_PRIVATE_ID = 542711955
+MY_PRIVATE_ID = 542711955   # Twój prywatny chat_id
 
 MIN_VOLUME_24H = 250_000
 
@@ -43,7 +43,7 @@ def send(msg, to_private=False):
         except:
             pass
 
-send("CEX Pump & Dump Scanner 2025 uruchomiony\nCoinEx • Bybit • Gate • MEXC • KuCoin • OKX")
+send("CEX Pump & Dump Scanner 2025 uruchomiony\nCoinEx • Bybit • Gate • MEXC • KuCoin • OKX\nŁapie longi i shorty w pierwszych minutach")
 
 def polling():
     while True:
@@ -58,18 +58,18 @@ def polling():
                         if txt in ["/start", "/help"]:
                             send("CEX Pump & Dump Scanner v12.2025\n\nKomendy:\n/stats\n/uptime\n/top")
                         elif txt == "/stats":
-                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts}")
+                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts} | Godzina: {hour_alerts}")
                         elif txt in ["/uptime", "/status"]:
                             send(f"Żyję – uptime: {format_uptime(time.time()-start_time)}")
                         elif txt == "/top":
-                            send("Ostatnie 10:\n\n" + "\n".join(last_alerts[-10:]) if last_alerts else "Czekamy...")
+                            send("Ostatnie 10:\n\n" + "\n".join(last_alerts[-10:]) if last_alerts else "Czekamy na mięso...")
         except:
             pass
         time.sleep(5)
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("CEX Pump & Dump Scanner działa!")
+print("CEX Pump & Dump Scanner 2025 działa idealnie!")
 
 while True:
     try:
@@ -81,20 +81,21 @@ while True:
                     try:
                         o = ex.fetch_ohlcv(s, "5m", limit=50)
                         if len(o) < 30: continue
+
                         current_price = o[-1][4]
                         vol_now = o[-1][5]
                         vol_prev = sum(x[5] for x in o[-25:-1]) / 24
                         if vol_prev == 0: continue
                         ratio = vol_now / vol_prev
-                        price_ch = (o[-1][4] - o[-2][4]) / o[-2][4] * 100
+                        price_ch = (current_price - o[-2][4]) / o[-2][4] * 100
                         ticker = ex.fetch_ticker(s)
                         vol24 = ticker.get("quoteVolume", vol_now * current_price)
 
                         if ratio > 9 and abs(price_ch) > 5 and vol24 > MIN_VOLUME_24H:
                             base = s.split("/")[0].split(":")[0].upper()
-                            alert_id = f"{base}_{ex.name}_{'LONG' if price_ch > 0 else 'SHORT'}"
+                            alert_id = f"{base}_{ex.name}_{'L' if price_ch > 0 else 'S'}"
                             if alert_id in seen_alerts: continue
-                            seen_alerts.add(alert_id
+                            seen_alerts.add(alert_id)
 
                             link = EXCHANGE_LINKS.get(ex.name, "https://dexscreener.com/search?q=" + base)
                             link = link.replace("{base}", base)
@@ -111,7 +112,7 @@ while True:
                             total_alerts += 1
                             today_alerts += 1
                             hour_alerts += 1
-                            last_alerts.append(f"{datetime.now().strftime('%H:%M')} | {base} | {ex.name} | {direction} | {price_ch:+.1f}%")
+                            last_alerts.append(f"{datetime.now().strftime('%H:%M')} | {base} | {ex.name} | {direction} | {price_ch:+.2f}%")
                     except: continue
                 time.sleep(1)
             except Exception as e:
