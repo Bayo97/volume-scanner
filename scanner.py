@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-MY_USER_ID = 542711955   # Twój user_id
+MY_USER_ID = 542711955   # Twój user_id – działa w grupie i prywatnie
 
 MIN_VOLUME_24H = 250_000
 
@@ -41,44 +41,60 @@ def send(msg):
         except:
             pass
 
-send("CEX Scanner 2025 uruchomiony – wpisz /help")
+send("CEX Scanner 2025 uruchomiony – wpisz /help po komendy")
 
 def polling():
+    offset = None
     while True:
         try:
-            r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates",
-                             params={"timeout": 20}, timeout=25).json()
-            for u in r.get("result", []):
-                if "message" in u:
-                    user_id = u["message"]["from"]["id"]
-                    txt = u["message"].get("text", "").strip().lower()
+            params = {"timeout": 20}
+            if offset:
+                params["offset"] = offset
 
-                    if user_id == MY_USER_ID:
-                        if txt == "/help":
-                            send("CEX Volume Pump Scanner v12.2025\n\nKomendy:\n/startcex – włącz alerty\n/stopcex – wyłącz alerty\n/last lub /alert – ostatnie 10 alertów\n/stats – uptime + liczba alertów\n/uptime – tylko czas działania")
-                        elif txt == "/startcex":
-                            global scanner_active
-                            scanner_active = True
-                            send("Alerty włączone")
-                        elif txt == "/stopcex":
-                            scanner_active = False
-                            send("Alerty wyłączone")
-                        elif txt in ["/last", "/alert"]:
-                            if last_alerts:
-                                send("Ostatnie alerty:\n\n" + "\n".join(last_alerts[-10:]))
-                            else:
-                                send("Brak alertów")
-                        elif txt == "/stats":
-                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts}")
-                        elif txt == "/uptime":
-                            send(f"Uptime: {format_uptime(time.time()-start_time)}")
+            r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates",
+                             params=params, timeout=25).json()
+
+            for u in r.get("result", []):
+                offset = u["update_id"] + 1
+
+                if "message" not in u:
+                    continue
+
+                user_id = u["message"]["from"]["id"]
+                txt = u["message"].get("text", "").strip()
+
+                print(f"ODEBRANO od user_id {user_id}: {txt}")  # widzisz w Logs
+
+                if user_id != MY_USER_ID:
+                    continue  # tylko Ty możesz używać komend
+
+                txt = txt.lower()
+
+                if txt in ["/start", "/help"]:
+                    send("CEX Pump Scanner v12.2025\n\nKomendy:\n/startcex – włącz alerty\n/stopcex – wyłącz alerty\n/last lub /alert – ostatnie 10 alertów\n/stats – statystyki\n/uptime – czas działania")
+                elif txt == "/startcex":
+                    global scanner_active
+                    scanner_active = True
+                    send("Alerty włączone")
+                elif txt == "/stopcex":
+                    scanner_active = False
+                    send("Alerty wyłączone")
+                elif txt in ["/last", "/alert"]:
+                    if last_alerts:
+                        send("Ostatnie 10 alertów:\n\n" + "\n".join(last_alerts[-10:]))
+                    else:
+                        send("Brak alertów")
+                elif txt == "/stats":
+                    send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów ogółem: {total_alerts} | Dziś: {today_alerts}")
+                elif txt == "/uptime":
+                    send(f"Uptime: {format_uptime(time.time()-start_time)}")
         except Exception as e:
             print(f"Polling błąd: {e}")
         time.sleep(5)
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("CEX Scanner final 2025 – działa idealnie")
+print("CEX Scanner – finalna wersja, działa idealnie")
 
 while True:
     if not scanner_active:
@@ -103,14 +119,14 @@ while True:
                         ticker = ex.fetch_ticker(s)
                         vol24 = ticker.get("quoteVolume", vol_now * current_price)
 
-                        if ratio > 9 and abs(price_ch > 5 or price_ch < -5) and vol24 > MIN_VOLUME_24H:
+                        if ratio > 9 and abs(price_ch) > 5 and vol24 > MIN_VOLUME_24H:
                             base = s.split("/")[0].split(":")[0].upper()
                             alert_id = f"{base}_{ex.name}_{'L' if price_ch > 0 else 'S'}"
                             if alert_id in seen_alerts: continue
                             seen_alerts.add(alert_id)
 
                             link = EXCHANGE_LINKS.get(ex.name, "https://dexscreener.com/search?q=" + base)
-                            link = link.replace("{base}", base)
+                            link = link.replace("{base}", base}", base)
 
                             direction = "LONG 🚀" if price_ch > 0 else "SHORT 💥"
                             timestamp = datetime.now().strftime('%d.%m %H:%M')
