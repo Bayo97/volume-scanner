@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-MY_PRIVATE_ID = 542711955   # Twój prywatny chat_id – możesz tu dodać więcej, np. [542711955, 123456789]
+MY_PRIVATE_ID = 542711955
 
 MIN_VOLUME_24H = 250_000
 
@@ -32,18 +32,17 @@ seen_alerts = set()
 
 def format_uptime(sec): return str(timedelta(seconds=int(sec))).split('.')[0]
 
-def send(msg, to_private=False):
+def send(msg):
     for cid in CHAT_IDS:
         try:
-            if to_private and cid != MY_PRIVATE_ID and cid not in [MY_PRIVATE_ID]:  # tylko Ty widzisz błędy
-                continue
             requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage",
                           data={"chat_id": cid, "text": msg, "parse_mode": "HTML", "disable_web_page_preview": True},
                           timeout=10)
         except:
             pass
 
-send("CEX Scanner 2025 działa na grupie i prywatnie")
+# Jednorazowa wiadomość startowa
+send("CEX Scanner 2025 uruchomiony – wszystko działa idealnie")
 
 def polling():
     while True:
@@ -55,11 +54,11 @@ def polling():
                     cid = u["message"]["chat"]["id"]
                     txt = u["message"].get("text", "").strip().lower()
 
-                    print(f"ODEBRANO od {cid}: {txt}")  # widoczne w Railway Logs
+                    print(f"ODEBRANO od {cid}: {txt}")  # widzisz w Logs
 
-                    if cid == MY_PRIVATE_ID or cid < 0:  # prywatnie lub grupa – ale komendy tylko od Ciebie
+                    if cid == MY_PRIVATE_ID:
                         if txt in ["/start", "/help"]:
-                            send("CEX Scanner v12.2025\nKomendy (tylko Ty):\n/stats\n/uptime\n/top")
+                            send("CEX Scanner v12.2025\nKomendy:\n/stats\n/uptime\n/top")
                         elif txt == "/stats":
                             send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts}")
                         elif txt in ["/uptime", "/status"]:
@@ -67,12 +66,12 @@ def polling():
                         elif txt == "/top":
                             send("Ostatnie 10:\n\n" + "\n".join(last_alerts[-10:]) if last_alerts else "Czekamy...")
         except Exception as e:
-            print(f"Polling błąd: {e}")
+            print(f"Polling błąd: {e}")  # tylko w Logs, zero spamu do TG
         time.sleep(5)
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("CEX Scanner final – grupa + prywatnie")
+print("CEX Scanner – zero spamu, działa idealnie")
 
 while True:
     try:
@@ -118,10 +117,10 @@ while True:
                     except: continue
                 time.sleep(1)
             except Exception as e:
-                send(f"Błąd {ex.name}: {e}", to_private=True)
+                print(f"Błąd {ex.name}: {e}")  # tylko w Logs
 
         seen_alerts.clear()
         time.sleep(300)
     except Exception as e:
-        send(f"Krytyczny błąd: {e}", to_private=True)
+        print(f"Krytyczny błąd: {e}")  # tylko w Logs
         time.sleep(60)
