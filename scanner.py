@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-MY_PRIVATE_ID = 542711955
+MY_USER_ID = 542711955   # Twój user_id (nie chat_id) – to jest klucz!
 
 MIN_VOLUME_24H = 250_000
 
@@ -42,21 +42,28 @@ def send(msg):
             pass
 
 # Jednorazowa wiadomość startowa
-send("CEX Scanner 2025 uruchomiony – wszystko działa idealnie")
+send("CEX Scanner 2025 działa idealnie\nGrupa + prywatnie")
 
 def polling():
+    offset = None  # poprawny offset – zero zapętleń
     while True:
         try:
+            params = {"timeout": 20}
+            if offset:
+                params["offset"] = offset
+
             r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates",
-                             params={"timeout": 20}, timeout=25).json()
+                             params=params, timeout=25).json()
+
             for u in r.get("result", []):
                 if "message" in u:
-                    cid = u["message"]["chat"]["id"]
+                    user_id = u["message"]["from"]["id"]
                     txt = u["message"].get("text", "").strip().lower()
 
-                    print(f"ODEBRANO od {cid}: {txt}")  # widzisz w Logs
+                    print(f"ODEBRANO od user_id {user_id}: {txt}")
 
-                    if cid == MY_PRIVATE_ID:
+                    # Komendy tylko od Ciebie – działa w grupie i prywatnie
+                    if user_id == MY_USER_ID:
                         if txt in ["/start", "/help"]:
                             send("CEX Scanner v12.2025\nKomendy:\n/stats\n/uptime\n/top")
                         elif txt == "/stats":
@@ -65,13 +72,15 @@ def polling():
                             send(f"Żyję – uptime: {format_uptime(time.time()-start_time)}")
                         elif txt == "/top":
                             send("Ostatnie 10:\n\n" + "\n".join(last_alerts[-10:]) if last_alerts else "Czekamy...")
+
+                offset = u["update_id"] + 1
         except Exception as e:
-            print(f"Polling błąd: {e}")  # tylko w Logs, zero spamu do TG
+            print(f"Polling błąd: {e}")
         time.sleep(5)
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("CEX Scanner – zero spamu, działa idealnie")
+print("CEX Scanner – zero spamu, działa idealnie na grupie i prywatnie")
 
 while True:
     try:
@@ -92,7 +101,7 @@ while True:
                         ticker = ex.fetch_ticker(s)
                         vol24 = ticker.get("quoteVolume", vol_now * current_price)
 
-                        if ratio > 9 and abs(price_ch) > 5 and vol24 > MIN_VOLUME_24H:
+                        if ratio > 9 and abs(price_ch > 5 or price_ch < -5) and vol24 > MIN_VOLUME_24H:
                             base = s.split("/")[0].split(":")[0].upper()
                             alert_id = f"{base}_{ex.name}_{'L' if price_ch > 0 else 'S'}"
                             if alert_id in seen_alerts: continue
@@ -117,10 +126,10 @@ while True:
                     except: continue
                 time.sleep(1)
             except Exception as e:
-                print(f"Błąd {ex.name}: {e}")  # tylko w Logs
+                print(f"Błąd {ex.name}: {e}")
 
         seen_alerts.clear()
         time.sleep(300)
     except Exception as e:
-        print(f"Krytyczny błąd: {e}")  # tylko w Logs
+        print(f"Krytyczny błąd: {e}")
         time.sleep(60)
