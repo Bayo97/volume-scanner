@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-MY_USER_ID = 542711955   # Twój user_id (nie chat_id) – to jest klucz!
+MY_PRIVATE_ID = 542711955   # Twój user_id (nie chat_id)
 
 MIN_VOLUME_24H = 250_000
 
@@ -24,11 +24,12 @@ EXCHANGE_LINKS = {
 exchanges = [ccxt.coinex(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
 
 start_time = time.time()
-total_alerts = 0
+total_alerts =  = 0
 today_alerts = 0
-hour_alerts = 0
-last_alerts = []
+last_alerts = []  # z timestampem
 seen_alerts = set()
+
+scanner_active = True  # startuje włączony
 
 def format_uptime(sec): return str(timedelta(seconds=int(sec))).split('.')[0]
 
@@ -42,47 +43,50 @@ def send(msg):
             pass
 
 # Jednorazowa wiadomość startowa
-send("CEX Scanner 2025 działa idealnie\nGrupa + prywatnie")
+send("CEX Scanner 2025 uruchomiony\nKomendy dostępne przez /help")
 
 def polling():
-    offset = None  # poprawny offset – zero zapętleń
     while True:
         try:
-            params = {"timeout": 20}
-            if offset:
-                params["offset"] = offset
-
             r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates",
-                             params=params, timeout=25).json()
-
+                             params={"timeout": 20}, timeout=25).json()
             for u in r.get("result", []):
                 if "message" in u:
                     user_id = u["message"]["from"]["id"]
                     txt = u["message"].get("text", "").strip().lower()
 
-                    print(f"ODEBRANO od user_id {user_id}: {txt}")
-
-                    # Komendy tylko od Ciebie – działa w grupie i prywatnie
-                    if user_id == MY_USER_ID:
-                        if txt in ["/start", "/help"]:
-                            send("CEX Scanner v12.2025\nKomendy:\n/stats\n/uptime\n/top")
+                    if user_id == MY_PRIVATE_ID:
+                        if txt == "/help":
+                            send("CEX Volume Pump Scanner v12.2025\n\nOpis:\nSkanuje CoinEx, Bybit, Gate.io, MEXC, KuCoin, OKX\nŁapie nietypowe skoki wolumenu w parach o dobrej płynności\nAlerty z ceną, % zmiany, LONG/SHORT i bezpośrednim linkiem do giełdy\n\nKomendy (tylko Ty):\n/startcex – włącz alerty\n/stopcex – wyłącz alerty\n/last lub /alert – ostatnie 10 alertów\n/stats – uptime + liczba alertów\n/uptime – tylko czas działania")
+                        elif txt == "/startcex":
+                            global scanner_active
+                            scanner_active = True
+                            send("Skaner włączony – alerty aktywne")
+                        elif txt == "/stopcex":
+                            scanner_active = False
+                            send("Skaner zatrzymany – zero alertów")
+                        elif txt in ["/last", "/alert"]:
+                            if last_alerts:
+                                send("Ostatnie alerty:\n\n" + "\n".join(last_alerts[-10:]))
+                            else:
+                                send("Brak alertów do tej pory")
                         elif txt == "/stats":
-                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts}")
-                        elif txt in ["/uptime", "/status"]:
-                            send(f"Żyję – uptime: {format_uptime(time.time()-start_time)}")
-                        elif txt == "/top":
-                            send("Ostatnie 10:\n\n" + "\n".join(last_alerts[-10:]) if last_alerts else "Czekamy...")
-
-                offset = u["update_id"] + 1
+                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów ogółem: {total_alerts} | Dziś: {today_alerts}")
+                        elif txt == "/uptime":
+                            send(f"Uptime: {format_uptime(time.time()-start_time)}")
         except Exception as e:
             print(f"Polling błąd: {e}")
         time.sleep(5)
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("CEX Scanner – zero spamu, działa idealnie na grupie i prywatnie")
+print("CEX Scanner z nowymi komendami działa idealnie!")
 
 while True:
+    if not scanner_active:
+        time.sleep(60)
+        continue
+
     try:
         for ex in exchanges:
             try:
@@ -101,7 +105,7 @@ while True:
                         ticker = ex.fetch_ticker(s)
                         vol24 = ticker.get("quoteVolume", vol_now * current_price)
 
-                        if ratio > 9 and abs(price_ch > 5 or price_ch < -5) and vol24 > MIN_VOLUME_24H:
+                        if ratio > 9 and abs(price_ch) > 5 and vol24 > MIN_VOLUME_24H:
                             base = s.split("/")[0].split(":")[0].upper()
                             alert_id = f"{base}_{ex.name}_{'L' if price_ch > 0 else 'S'}"
                             if alert_id in seen_alerts: continue
@@ -111,6 +115,7 @@ while True:
                             link = link.replace("{base}", base)
 
                             direction = "LONG 🚀" if price_ch > 0 else "SHORT 💥"
+                            timestamp = datetime.now().strftime('%d.%m %H:%M')
 
                             msg = f"🚨 {base}/USDT na {ex.name}\n" \
                                   f"Cena: ${current_price:.8f} ({price_ch:+.2f}%)\n" \
@@ -121,8 +126,7 @@ while True:
                             send(msg)
                             total_alerts += 1
                             today_alerts += 1
-                            hour_alerts += 1
-                            last_alerts.append(f"{datetime.now().strftime('%H:%M')} | {base} | {ex.name} | {direction} | {price_ch:+.2f}%")
+                            last_alerts.append(f"{timestamp} | {base} | {ex.name} | {direction} | {price_ch:+.2f}% | ×{ratio:.1f}")
                     except: continue
                 time.sleep(1)
             except Exception as e:
