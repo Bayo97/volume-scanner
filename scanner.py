@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-MY_PRIVATE_ID = 542711955   # Twój user_id (nie chat_id)
+MY_USER_ID = 542711955   # Twój user_id
 
 MIN_VOLUME_24H = 250_000
 
@@ -24,12 +24,11 @@ EXCHANGE_LINKS = {
 exchanges = [ccxt.coinex(), ccxt.bybit(), ccxt.gateio(), ccxt.mexc(), ccxt.kucoin(), ccxt.okx()]
 
 start_time = time.time()
-total_alerts =  = 0
+total_alerts = 0
 today_alerts = 0
-last_alerts = []  # z timestampem
+last_alerts = []
 seen_alerts = set()
-
-scanner_active = True  # startuje włączony
+scanner_active = True
 
 def format_uptime(sec): return str(timedelta(seconds=int(sec))).split('.')[0]
 
@@ -42,8 +41,7 @@ def send(msg):
         except:
             pass
 
-# Jednorazowa wiadomość startowa
-send("CEX Scanner 2025 uruchomiony\nKomendy dostępne przez /help")
+send("CEX Scanner 2025 uruchomiony – wpisz /help")
 
 def polling():
     while True:
@@ -55,23 +53,23 @@ def polling():
                     user_id = u["message"]["from"]["id"]
                     txt = u["message"].get("text", "").strip().lower()
 
-                    if user_id == MY_PRIVATE_ID:
+                    if user_id == MY_USER_ID:
                         if txt == "/help":
-                            send("CEX Volume Pump Scanner v12.2025\n\nOpis:\nSkanuje CoinEx, Bybit, Gate.io, MEXC, KuCoin, OKX\nŁapie nietypowe skoki wolumenu w parach o dobrej płynności\nAlerty z ceną, % zmiany, LONG/SHORT i bezpośrednim linkiem do giełdy\n\nKomendy (tylko Ty):\n/startcex – włącz alerty\n/stopcex – wyłącz alerty\n/last lub /alert – ostatnie 10 alertów\n/stats – uptime + liczba alertów\n/uptime – tylko czas działania")
+                            send("CEX Volume Pump Scanner v12.2025\n\nKomendy:\n/startcex – włącz alerty\n/stopcex – wyłącz alerty\n/last lub /alert – ostatnie 10 alertów\n/stats – uptime + liczba alertów\n/uptime – tylko czas działania")
                         elif txt == "/startcex":
                             global scanner_active
                             scanner_active = True
-                            send("Skaner włączony – alerty aktywne")
+                            send("Alerty włączone")
                         elif txt == "/stopcex":
                             scanner_active = False
-                            send("Skaner zatrzymany – zero alertów")
+                            send("Alerty wyłączone")
                         elif txt in ["/last", "/alert"]:
                             if last_alerts:
                                 send("Ostatnie alerty:\n\n" + "\n".join(last_alerts[-10:]))
                             else:
-                                send("Brak alertów do tej pory")
+                                send("Brak alertów")
                         elif txt == "/stats":
-                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów ogółem: {total_alerts} | Dziś: {today_alerts}")
+                            send(f"Uptime: {format_uptime(time.time()-start_time)}\nAlertów: {total_alerts} | Dziś: {today_alerts}")
                         elif txt == "/uptime":
                             send(f"Uptime: {format_uptime(time.time()-start_time)}")
         except Exception as e:
@@ -80,7 +78,7 @@ def polling():
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("CEX Scanner z nowymi komendami działa idealnie!")
+print("CEX Scanner final 2025 – działa idealnie")
 
 while True:
     if not scanner_active:
@@ -105,7 +103,7 @@ while True:
                         ticker = ex.fetch_ticker(s)
                         vol24 = ticker.get("quoteVolume", vol_now * current_price)
 
-                        if ratio > 9 and abs(price_ch) > 5 and vol24 > MIN_VOLUME_24H:
+                        if ratio > 9 and abs(price_ch > 5 or price_ch < -5) and vol24 > MIN_VOLUME_24H:
                             base = s.split("/")[0].split(":")[0].upper()
                             alert_id = f"{base}_{ex.name}_{'L' if price_ch > 0 else 'S'}"
                             if alert_id in seen_alerts: continue
@@ -126,7 +124,7 @@ while True:
                             send(msg)
                             total_alerts += 1
                             today_alerts += 1
-                            last_alerts.append(f"{timestamp} | {base} | {ex.name} | {direction} | {price_ch:+.2f}% | ×{ratio:.1f}")
+                            last_alerts.append(f"{timestamp} | {base} | {ex.name} | {direction} | {price_ch:+.2f}%")
                     except: continue
                 time.sleep(1)
             except Exception as e:
