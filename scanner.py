@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_IDS = [int(x) for x in os.environ.get("CHAT_IDS", "").split(",") if x.strip()]
 
-MY_USER_ID = 542711955   # Twój user_id – działa w grupie i prywatnie
+MY_USER_ID = 542711955
 
 MIN_VOLUME_24H = 250_000
 
@@ -41,7 +41,7 @@ def send(msg):
         except:
             pass
 
-send("CEX Scanner 2025 uruchomiony – wpisz /help po komendy")
+send("CEX Scanner 2025 uruchomiony – wpisz /help")
 
 def polling():
     offset = None
@@ -61,16 +61,14 @@ def polling():
                     continue
 
                 user_id = u["message"]["from"]["id"]
-                txt = u["message"].get("text", "").strip()
+                txt = u["message"].get("text", "").strip().lower()
 
-                print(f"ODEBRANO od user_id {user_id}: {txt}")  # widzisz w Logs
+                print(f"ODEBRANO od user_id {user_id}: {txt}")
 
                 if user_id != MY_USER_ID:
-                    continue  # tylko Ty możesz używać komend
+                    continue
 
-                txt = txt.lower()
-
-                if txt in ["/start", "/help"]:
+                if txt == "/help":
                     send("CEX Pump Scanner v12.2025\n\nKomendy:\n/startcex – włącz alerty\n/stopcex – wyłącz alerty\n/last lub /alert – ostatnie 10 alertów\n/stats – statystyki\n/uptime – czas działania")
                 elif txt == "/startcex":
                     global scanner_active
@@ -94,7 +92,7 @@ def polling():
 
 threading.Thread(target=polling, daemon=True).start()
 
-print("CEX Scanner – finalna wersja, działa idealnie")
+print("CEX Scanner – final 2025 – działa idealnie")
 
 while True:
     if not scanner_active:
@@ -126,7 +124,7 @@ while True:
                             seen_alerts.add(alert_id)
 
                             link = EXCHANGE_LINKS.get(ex.name, "https://dexscreener.com/search?q=" + base)
-                            link = link.replace("{base}", base}", base)
+                            link = link.replace("{base}", base)
 
                             direction = "LONG 🚀" if price_ch > 0 else "SHORT 💥"
                             timestamp = datetime.now().strftime('%d.%m %H:%M')
