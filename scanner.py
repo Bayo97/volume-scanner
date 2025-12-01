@@ -200,7 +200,7 @@ while True:
                                   f"Cena: ${current_price:.8f} ({price_ch:+.2f}%)\n" \
                                   f"Vol ×{ratio:.1f}\n" \
                                   f"{direction}\n" \
-                                  f"<a href='{link}'>OTWÓRZ NATYCHMIAST</a>"
+                                  f"<a href='{link}'>Otwórz giełdę</a>"
 
                             send(msg)
                             total_alerts += 1
